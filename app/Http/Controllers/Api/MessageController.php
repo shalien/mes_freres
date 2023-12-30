@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Message;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 
 class MessageController extends Controller
 {
@@ -29,14 +32,40 @@ class MessageController extends Controller
     public function store(Request $request)
     {
         //
+
+        DB::beginTransaction();
+
+        $from = Crypt::encryptString($request->all()['from']);
+        $to = Crypt::encryptString($request->all()['to']);
+        $content = Crypt::encryptString($request->all()['content']);
+
+        try {
+            $message = Message::create([
+                'from' => $from,
+                'to' => $to,
+                'content' => $content,
+            ]);
+            DB::commit();
+            return response()->json($message, 201);
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json(['message' => 'Store failed!'], 409);
+        }
+
     }
 
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(Message $message)
     {
         //
+
+        $message->from = Crypt::decryptString($message->from);
+        $message->to = Crypt::decryptString($message->to);
+        $message->content = Crypt::decryptString($message->content);
+
+        return response()->json($message, 200);
     }
 
     /**
@@ -58,8 +87,9 @@ class MessageController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy(Message $message)
     {
         //
+        return response()->json($message->delete(), 204);
     }
 }
